@@ -5,7 +5,7 @@ export default function Page(){
   return <main style={{minHeight:"100vh",background:"linear-gradient(135deg,#1a237e,#42a5f5)",padding:20,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",fontFamily:"sans-serif"}}>
     <div style={{textAlign:"center",color:"white",marginBottom:20}}>
       <h1 style={{fontSize:32,fontWeight:"bold",margin:0}}>GCTU HostelHub</h1>
-      <p style={{fontSize:12,opacity:0.8}}>GHANA - GHANA CHRISTIAN UNIVERSITY COLLEGE</p>
+      <p style={{fontSize:12,opacity:0.8}}>GHANA - GHANA COMMUNICATION TECHNOLOGY UNIVERSITY</p>
       <h2 style={{fontSize:28,marginTop:20}}>Welcome!</h2>
       <p>Find and manage hostel accommodation with ease</p>
     </div>
