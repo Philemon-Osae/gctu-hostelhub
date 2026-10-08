@@ -28,7 +28,6 @@ export default function Page(){
     };
     load();
 
-    // === NEW: 120 DAYS SEMESTER END REMINDER ===
     const checkSemesterEnd = async () => {
       const my = JSON.parse(localStorage.getItem("myBookings") || "[]");
       if (my.length === 0) return;
@@ -61,33 +60,59 @@ export default function Page(){
     return matchLoc && matchSearch;
   });
 
+  // === FIXED BOOKING FUNCTION - BLOCKS 1, abcd ===
   const bookRoom=async(room:any)=>{
-    if(!transId.trim()) return alert("Enter MoMo Transaction ID for 50 to 0206834470");
-    const my=JSON.parse(localStorage.getItem("myBookings")||"[]");
-    const ref=await addDoc(collection(db,"bookings"),{
-      hostelId:showBook.id,
-      hostelName:showBook.name,
-      studentName:student.name,
-      studentCourse:student.course,
-      studentIndex:student.indexNumber,
-      studentPhone:student.phone,
-      studentEmail:student.email,
-      studentUid:student.uid,
-      roomType:room.type,
-      price:room.price,
-      adminFeePaid:true,
-      adminFeeAmount:50,
-      adminMomoNumber:"0206834470",
-      momoTransactionId:transId.trim(),
-      rentPaid:false,
-      status:"booked",
-      commissionAmount: Math.floor(room.price*0.05),
-      ownerAmount: room.price - Math.floor(room.price*0.05),
-      createdAt:new Date().toISOString()
-    });
-    localStorage.setItem("myBookings",JSON.stringify([...my,{id:ref.id,hostelName:showBook.name,roomType:room.type}]));
-    alert(`Booked! Trans ${transId} - Pay 50 to 0206834470 verified. Go to My Bookings. Owner will confirm.`);
-    setShowBook(null); setTransId(""); r.push("/my-bookings");
+    const rawId = transId.trim().toUpperCase();
+
+    if(!rawId){
+      return alert("Enter MoMo Transaction ID for 50 to 0206834470");
+    }
+
+    // BLOCK FAKE IDs
+    if(rawId.length < 8){
+      return alert(`❌ Invalid ID! "${rawId}" too short.\n\nReal MoMo IDs are 8-12 chars like:\n1234567890\nor MOMO1234567890\n\nCheck your MoMo SMS after sending 50 to 0206834470`);
+    }
+
+    if(["1","2","3","123","1234","TEST","MOMO","ABC","ABCD","MOMO123"].includes(rawId)){
+      return alert(`❌ Fake ID detected: "${rawId}"\n\nPlease enter REAL Transaction ID from MoMo SMS after you send 50 GHS to 0206834470`);
+    }
+
+    if(!/^[A-Z0-9]{8,20}$/.test(rawId)){
+      return alert("❌ Invalid format. Use only letters and numbers, 8-20 characters. Example: 1234567890 or MOMO2338749201");
+    }
+
+    try {
+      const my=JSON.parse(localStorage.getItem("myBookings")||"[]");
+      const ref=await addDoc(collection(db,"bookings"),{
+        hostelId:showBook.id,
+        hostelName:showBook.name,
+        studentName:student.name,
+        studentCourse:student.course,
+        studentIndex:student.indexNumber,
+        studentPhone:student.phone,
+        studentEmail:student.email,
+        studentUid:student.uid,
+        roomType:room.type,
+        price:room.price,
+        adminFeePaid:false, // Will be true after admin verifies
+        adminFeeAmount:50,
+        adminMomoNumber:"0206834470",
+        momoTransactionId:rawId, // Clean ID
+        transId:rawId, // For compatibility
+        rentPaid:false,
+        status:"PENDING_VERIFICATION", // FIXED: NOT booked, PENDING until you verify 50 GHS
+        verified:false,
+        commissionAmount: Math.floor(room.price*0.05),
+        ownerAmount: room.price - Math.floor(room.price*0.05),
+        createdAt:new Date().toISOString(),
+        bookedAt:new Date().toISOString()
+      });
+      localStorage.setItem("myBookings",JSON.stringify([...my,{id:ref.id,hostelName:showBook.name,roomType:room.type}]));
+      alert(`✅ SUBMITTED!\n\nHostel: ${showBook.name}\nRoom: ${room.type}\nTrans ID: ${rawId}\nAmount: 50 GHS to 0206834470\n\nStatus: ⏳ PENDING VERIFICATION\nAdmin will check your payment and confirm. T-Code appears in My Bookings after verification.`);
+      setShowBook(null); setTransId(""); r.push("/my-bookings");
+    } catch (e:any) {
+      alert("Error: " + e.message);
+    }
   };
 
   const logout=()=>{ if(confirm("Logout? Next student can login on same phone")){ localStorage.removeItem("student"); r.push("/student/login"); } };
@@ -128,13 +153,14 @@ export default function Page(){
         <h3>Book {showBook.name}</h3>
         <p style={{fontSize:12}}>Pay GHC 50 booking fee to Admin MoMo <b>0206834470</b><br/>Then enter Transaction ID</p>
         <div style={{background:"#e3f2fd",padding:10,borderRadius:8,fontSize:12,marginTop:8}}>
-          1. Open MoMo App<br/>2. Send 50 to 0206834470<br/>3. Copy Trans ID e.g. MOMO123456<br/>4. Paste below
+          1. Open MoMo App<br/>2. Send 50 to 0206834470<br/>3. Copy Trans ID e.g. MOMO1234567890 (8+ chars)<br/>4. Paste below
         </div>
         {showBook.rooms?.map((rm:any,i:number)=><div key={i} style={{border:"1px solid #ddd",padding:10,borderRadius:8,marginTop:8,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
           <div><b>{rm.type}</b><br/>GHC {rm.price}/month + 50 fee to 0206834470<br/><small>Commission 5% = GHC {Math.floor(rm.price*0.05)}</small></div>
           <button onClick={()=>bookRoom(rm)} style={{background:"#1a237e",color:"white",padding:"8px 12px",borderRadius:6,border:0}}>Book This</button>
         </div>)}
         <input placeholder="Enter MoMo Trans ID e.g. MOMO2338749201 for 50 to 0206834470" value={transId} onChange={e=>setTransId(e.target.value)} style={{width:"100%",padding:12,marginTop:10,border:"2px solid #1a237e",borderRadius:8}} />
+        <small style={{fontSize:10,color:"red"}}>Type 1 or abcd will be blocked - Enter real MoMo ID (8+ chars)</small>
         <button onClick={()=>{setShowBook(null);setTransId("");}} style={{width:"100%",background:"#eee",padding:10,borderRadius:8,border:0,marginTop:8}}>Cancel</button>
       </div>
     </div>}
