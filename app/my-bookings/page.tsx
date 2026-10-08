@@ -27,7 +27,6 @@ export default function Page(){
         return days >= 120;
       });
       setReminderBookings(overdue);
-      // Mark code as seen
       myList.forEach(async (b:any)=>{
         if(b.bookingCode &&!b.codeSeenByStudent){
           await updateDoc(doc(db,"bookings",b.id),{codeSeenByStudent:true,codeSeenAt:new Date().toISOString()});
@@ -48,15 +47,50 @@ export default function Page(){
 
     {reminderBookings.length>0 && <div style={{background:"#ff5722",color:"white",padding:12,borderRadius:10,marginTop:10}}><b>⏰ {reminderBookings.length} room(s) overdue 120 days - Checkout please</b></div>}
 
-    {list.length===0&&<p>No bookings</p>}
+    {list.length===0&&<p>No bookings - If you typed 1 or abcd before, it was fake. Book again with real Trans ID to 0206834470</p>}
     {list.map((b:any)=>{
       const movedIn = b.verifiedAt? new Date(b.verifiedAt) : new Date(b.createdAt);
       const days = b.status==="moved_in"? Math.floor((new Date().getTime()-movedIn.getTime())/(1000*60*60*24)) : 0;
+      
+      // === FIXED: Detect fake IDs ===
+      const isFakeId = !b.momoTransactionId || b.momoTransactionId.length < 8 || ["1","123","ABCD","TEST"].includes(b.momoTransactionId?.toUpperCase());
+
       return <div key={b.id} style={{border:"2px solid #1a237e",padding:14,marginTop:12,borderRadius:12,background:"white"}}>
       <b>{b.hostelName}</b> - {b.roomType}<br/>
-      <span style={{fontSize:12,background:b.status==="moved_in"?"#c8e6c9":b.status==="checked_out"?"#ffcdd2":"#e3f2fd",padding:"4px 8px",borderRadius:10}}>{b.status.toUpperCase()} {days>0?` - ${days} days`:""}</span>
+      
+      {/* FIXED STATUS BADGE WITH PENDING */}
+      <span style={{
+        fontSize:12,
+        background:
+          b.status==="PENDING_VERIFICATION" ? "#ffecb3" :
+          b.status==="moved_in" ? "#c8e6c9" :
+          b.status==="checked_out" ? "#ffcdd2" :
+          b.status==="confirmed" ? "#c8e6c9" :
+          b.status==="CANCELLED" ? "#ffcdd2" : "#e3f2fd",
+        color: b.status==="PENDING_VERIFICATION" ? "#795548" : "black",
+        padding:"4px 8px",borderRadius:10, fontWeight: "bold"
+      }}>
+        {(b.status==="PENDING_VERIFICATION" ? "⏳ PENDING VERIFICATION" : b.status?.toUpperCase())} {days>0?` - ${days} days`:""}
+      </span>
 
-      {/* NEW: BIG T-CODE DISPLAY */}
+      {/* FIXED: Show warning for fake ID */}
+      {isFakeId && b.status==="PENDING_VERIFICATION" && (
+        <div style={{background:"#ffcdd2",padding:10,borderRadius:8,marginTop:8,border:"2px solid red"}}>
+          <b>❌ FAKE ID DETECTED: "{b.momoTransactionId}"</b><br/>
+          <small>This Trans ID is too short/fake. Send 50 GHS to 0206834470 and update with real ID, or booking will be cancelled.</small>
+        </div>
+      )}
+
+      {/* PENDING MESSAGE */}
+      {b.status==="PENDING_VERIFICATION" && !isFakeId && (
+        <div style={{background:"#fff9c4",padding:10,borderRadius:8,marginTop:8,border:"1px solid #fbc02d"}}>
+          <b>⏳ Awaiting Admin Verification</b><br/>
+          <small>Admin checking 50 GHS payment ID <b>{b.momoTransactionId || b.transId}</b> to 0206834470.<br/>
+          T-Code will appear after verification (24h). If no payment, booking cancelled.</small>
+        </div>
+      )}
+
+      {/* BIG T-CODE DISPLAY - unchanged */}
       {b.bookingCode && b.status==="rent_paid" && (
         <div style={{background:"#1a237e",color:"white",padding:14,borderRadius:10,marginTop:10,textAlign:"center",border:"3px dashed #ffeb3b"}}>
           <small style={{opacity:0.8}}>YOUR ENTRY CODE - SHOW AT GATE</small><br/>
@@ -66,7 +100,7 @@ export default function Page(){
       )}
       {b.bookingCode && b.status==="confirmed" && <div style={{background:"#fff9c4",padding:8,borderRadius:8,marginTop:8}}>Code generating soon...</div>}
 
-      <br/><small>Trans {b.momoTransactionId} to 0206834470 - {b.verifiedAt?`Moved in: ${new Date(b.verifiedAt).toLocaleString()}`:`Booked: ${new Date(b.createdAt).toLocaleString()}`}{b.checkoutApprovedAt?` - Checked out: ${new Date(b.checkoutApprovedAt).toLocaleString()}`:""}</small>
+      <br/><small>Trans {b.momoTransactionId || b.transId} to 0206834470 - {b.verifiedAt?`Moved in: ${new Date(b.verifiedAt).toLocaleString()}`:`Booked: ${new Date(b.createdAt || b.bookedAt).toLocaleString()}`}{b.checkoutApprovedAt?` - Checked out: ${new Date(b.checkoutApprovedAt).toLocaleString()}`:""}</small>
 
       {b.status==="confirmed"&&<button onClick={()=>payRent(b)} style={{background:"#1a237e",color:"white",padding:10,marginTop:8,width:"100%",borderRadius:8,border:0}}>I Paid Rent GHC {b.price}</button>}
 
@@ -78,12 +112,12 @@ export default function Page(){
 
       {b.status==="checkout_requested"&&<div style={{background:"#fff9c4",padding:10,borderRadius:8,marginTop:8}}>⏳ Waiting owner inspection</div>}
       {b.status==="checked_out"&&<div><div style={{background:"#ffcdd2",padding:10,borderRadius:8,marginTop:8}}>📦 Checked out {b.checkoutApprovedAt?new Date(b.checkoutApprovedAt).toLocaleString():""} - {b.damageFee?`Damage GHC ${b.damageFee}`:"No damage"}</div><div style={{display:"flex",gap:6,marginTop:8}}>{[1,2,3,4,5].map(n=><button key={n} onClick={()=>rateHostel(b,n)} style={{background:b.rating>=n?"#ff9800":"#eee",border:0,padding:"6px 10px",borderRadius:6}}>⭐{n}</button>)}</div></div>}
+      {b.status==="CANCELLED"&&<div style={{background:"#ffcdd2",padding:10,borderRadius:8,marginTop:8}}>❌ Cancelled - No MoMo payment found on 0206834470 for ID {b.momoTransactionId}</div>}
     </div>
     })}
 
     {selectedBookingForFault && <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",display:"flex",justifyContent:"center",alignItems:"center",padding:12,zIndex:999}}><div style={{background:"white",padding:16,borderRadius:12,width:"100%",maxWidth:400}}><h3>🔧 Report Fault for {selectedBookingForFault.hostelName} - {selectedBookingForFault.roomType}</h3><textarea placeholder="E.g. Tap is leaking, Light not working, Door lock broken..." value={faultDesc} onChange={e=>setFaultDesc(e.target.value)} style={{width:"100%",padding:10,border:"1px solid #ccc",borderRadius:8,minHeight:80,marginTop:8}}></textarea><button onClick={reportFault} style={{width:"100%",background:"#d32f2f",color:"white",padding:12,borderRadius:8,border:0,marginTop:8}}>Send to Owner</button><button onClick={()=>setSelectedBookingForFault(null)} style={{width:"100%",background:"#eee",padding:10,borderRadius:8,border:0,marginTop:6}}>Cancel</button></div></div>}
 
-    {/* ROOMMATE FINDER */}
     <div style={{background:"white",border:"2px solid #6a1b9a",padding:14,borderRadius:12,marginTop:20}}><h3>👥 Find Roommate - Post Request</h3><RoommateSection /></div>
   </main>
 }
