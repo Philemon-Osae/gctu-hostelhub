@@ -3,9 +3,10 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import InstallPrompt from "@/components/InstallPrompt";
 const inter = Inter({ subsets: ["latin"] });
-export const metadata: Metadata = {
-  title: "GCTU HostelHub - MoMo 0206834470",
-  description: "Find and book hostels near GCTU - Ghana - MoMo 0206834470",
+export const metadata = {
+  title: "GCTU HostelHub",
+  description: "Find and book hostels near GCTU. Secure and affordable accommodation for students.",
+  
   manifest: "/manifest.json",
   themeColor: "#1a237e",
 };
